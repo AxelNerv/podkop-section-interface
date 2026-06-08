@@ -2,7 +2,7 @@
 "require form";
 "require baseclass";
 "require ui";
-"require network";
+"require uci";
 "require tools.widgets as widgets";
 "require view.podkop.main as main";
 
@@ -646,25 +646,24 @@ function createSectionContent(section) {
   o.depends("connection_type", "vpn");
 
   // Dynamically populate interface list from router's UCI network config.
-  // Overrides load() so the dropdown is built once per form load, before render.
+  // Uses uci.load('network') + uci.sections() — works in any LuCI version.
   (function (opt) {
     var _load = opt.load.bind(opt);
     opt.load = function (section_id) {
       return Promise.all([
         _load(section_id),
-        L.resolveDefault(network.getInterfaces(), []),
+        uci.load("network"),
       ]).then(function (results) {
         var storedVal = results[0];
-        var ifaces = results[1] || [];
 
         // Reset option list
         opt.keylist = [""];
         opt.vallist = [_("Отключено")];
 
-        // Skip system/WAN interfaces that are not useful here
+        // Skip system/WAN interfaces
         var skip = ["loopback", "wan", "wan6"];
-        ifaces.forEach(function (iface) {
-          var name = iface.getName();
+        uci.sections("network", "interface").forEach(function (s) {
+          var name = s[".name"];
           if (skip.indexOf(name) === -1) {
             opt.keylist.push(name);
             opt.vallist.push(name);
