@@ -1,7 +1,8 @@
-﻿"use strict";
+"use strict";
 "require form";
 "require baseclass";
 "require ui";
+"require network";
 "require tools.widgets as widgets";
 "require view.podkop.main as main";
 
@@ -640,13 +641,40 @@ function createSectionContent(section) {
       "Выберите сетевой интерфейс, подсеть которого будет автоматически добавлена в «Полностью маршрутизированные IP-адреса». Оставьте пустым для отключения.",
     ),
   );
-  o.value("", _("Отключено"));
-  o.value("br-lan", "br-lan");
-  o.value("vlan2", "vlan2");
-  o.value("vlan3", "vlan3");
   o.rmempty = true;
   o.depends("connection_type", "proxy");
   o.depends("connection_type", "vpn");
+
+  // Dynamically populate interface list from router's UCI network config.
+  // Overrides load() so the dropdown is built once per form load, before render.
+  (function (opt) {
+    var _load = opt.load.bind(opt);
+    opt.load = function (section_id) {
+      return Promise.all([
+        _load(section_id),
+        L.resolveDefault(network.getInterfaces(), []),
+      ]).then(function (results) {
+        var storedVal = results[0];
+        var ifaces = results[1] || [];
+
+        // Reset option list
+        opt.keylist = [""];
+        opt.vallist = [_("Отключено")];
+
+        // Skip system/WAN interfaces that are not useful here
+        var skip = ["loopback", "wan", "wan6"];
+        ifaces.forEach(function (iface) {
+          var name = iface.getName();
+          if (skip.indexOf(name) === -1) {
+            opt.keylist.push(name);
+            opt.vallist.push(name);
+          }
+        });
+
+        return storedVal;
+      });
+    };
+  })(o);
 
   o = section.option(
     form.DynamicList,
