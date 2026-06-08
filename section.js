@@ -635,12 +635,12 @@ function createSectionContent(section) {
   o = section.option(
     form.Value,
     "section_interface",
-    _("Section Interface"),
+    _("Интерфейс секции"),
     _(
-      "Select a network interface whose subnet will be automatically added to Fully Routed IPs. Leave empty to disable.",
+      "Выберите сетевой интерфейс, подсеть которого будет автоматически добавлена в «Полностью маршрутизированные IP-адреса». Оставьте пустым для отключения.",
     ),
   );
-  o.value("", _("Disabled"));
+  o.value("", _("Отключено"));
   o.value("br-lan", "br-lan");
   o.value("vlan2", "vlan2");
   o.value("vlan3", "vlan3");
