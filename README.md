@@ -14,11 +14,11 @@
 **После установки патча:**
 - В каждой секции типа **Proxy** или **VPN** появляется поле **«Интерфейс секции»**
 - Доступные значения: `br-lan`, `vlan2`, `vlan3` или любое своё
-- При старте Podkop читает UCI опцию `section_interface`, определяет подсеть через `ip addr show <iface>`, и добавляет её в маршрутизацию
+- При старте Podkop читает UCI опцию `section_interface`, автоматически определяет реальное имя устройства через `ifstatus`, и добавляет подсеть в маршрутизацию
 
 **Пример лога после настройки:**
 ```
-podkop: [info] section MPROXY: adding subnet 192.168.2.0/24 from interface vlan2 to fully routed
+podkop: [info] section Mproxy: adding subnet 192.168.4.1/24 from interface vlan2 (phy1-ap1) to fully routed
 ```
 
 **Если поле оставить пустым** — ничего не меняется, секция работает как обычно.
@@ -119,6 +119,48 @@ wget -q https://raw.githubusercontent.com/AxelNerv/podkop-section-interface/main
 |------|-------------|
 | `/www/luci-static/resources/view/podkop/section.js` | Добавлено поле `Интерфейс секции` |
 | `/usr/bin/podkop` | Функция `include_source_ips_in_routing_handler()` читает `section_interface` и добавляет подсеть в маршрутизацию |
+
+---
+
+## Настройка Wi-Fi интерфейсов (важно!)
+
+По умолчанию Podkop не перехватывает трафик с отдельных Wi-Fi сетей (vlan2, vlan3). Чтобы они работали, нужно добавить **реальные имена устройств** в настройки Podkop.
+
+### Почему два разных имени
+
+В OpenWrt существуют:
+- **UCI-имя** — `vlan2`, `vlan3` (используется в конфигах, и в поле «Интерфейс секции»)
+- **Имя устройства ядра** — `phy1-ap1`, `phy1-ap2` (реальные сетевые интерфейсы в Linux)
+
+Podkop использует имена устройств для nftables-правил перехвата трафика, поэтому нужно добавить именно их в `source_network_interfaces`.
+
+### Узнать реальное имя интерфейса
+
+```sh
+# Узнать реальное имя для UCI vlan2:
+ifstatus vlan2 | jsonfilter -e '@.l3_device'
+# → например: phy1-ap1
+
+ifstatus vlan3 | jsonfilter -e '@.l3_device'
+# → например: phy1-ap2
+```
+
+Или посмотреть все интерфейсы:
+```sh
+ip link show | grep -E '^[0-9]+:' | awk '{print $2}' | tr -d ':'
+```
+
+### Добавить интерфейсы в Podkop
+
+```sh
+# Замени phy1-ap1 / phy1-ap2 на имена, которые вернул ifstatus у тебя
+uci add_list podkop.settings.source_network_interfaces=phy1-ap1
+uci add_list podkop.settings.source_network_interfaces=phy1-ap2
+uci commit podkop
+/etc/init.d/podkop restart
+```
+
+После этого устройства в этих Wi-Fi сетях получат доступ в интернет через Podkop, и поле **«Интерфейс секции»** заработает корректно.
 
 ---
 

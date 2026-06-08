@@ -57,12 +57,20 @@ include_source_ips_in_routing_handler() {
     local section_interface interface_subnet
     config_get section_interface "$section" "section_interface"
     if [ -n "$section_interface" ]; then
-        interface_subnet=$(ip addr show "$section_interface" 2>/dev/null | awk '/inet / {print $2}' | head -1)
+        local iface_dev
+        if ip link show "$section_interface" > /dev/null 2>&1; then
+            iface_dev="$section_interface"
+        else
+            iface_dev=$(ifstatus "$section_interface" 2>/dev/null | jsonfilter -e '@.l3_device' 2>/dev/null)
+        fi
+        if [ -n "$iface_dev" ]; then
+            interface_subnet=$(ip addr show "$iface_dev" 2>/dev/null | awk '/inet / {print $2}' | head -1)
+        fi
         if [ -z "$interface_subnet" ]; then
             log "section_interface '$section_interface' not found or has no IPv4 address" "warn"
             section_interface=""
         else
-            log "section $section: adding subnet $interface_subnet from interface $section_interface to fully routed" "info"
+            log "section $section: adding subnet $interface_subnet from interface $section_interface ($iface_dev) to fully routed" "info"
         fi
     fi
 
